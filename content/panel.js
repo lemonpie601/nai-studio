@@ -586,7 +586,7 @@
     it.status = 'saving';
     refreshTab('recent');
     const dataUrl = await blobToDataURL(it.blob);
-    if (pill && pill.__it === it) hideSavePill();
+    decorateBars();
     const r = await send(Object.assign({ type: 'save', dataUrl, kind: it.kind, meta: it.meta, t: it.t, n: it.n, w: it.w, h: it.h, hash: it.hash, force }, pick || {}));
     if (r.ok) {
       it.status = 'saved';
@@ -604,27 +604,113 @@
       if (r.error === 'invalidated') deadToast();
       else toast('저장 실패: ' + (r.error || r.reason || '알 수 없음'), 'err');
     }
+    decorateBars();
     refreshTab('recent');
   }
 
-  // 자동 저장이 꺼져 있을 때: 새 그림이 오면 버튼 옆에 작은 "저장" 쪽지
-  let pill = null;
+  // 자동 저장이 꺼져 있을 때: 새 그림이 오면 NovelAI 도구 줄의 우리 버튼에 금색 테두리, 플로팅 별 버튼엔 작은 금색 점
   function showSavePill(it) {
-    if (!fab || !root) return;
-    if (!pill) {
-      pill = document.createElement('button');
-      pill.className = 'savepill';
-      pill.addEventListener('click', () => { const cur = pill.__it; hideSavePill(); openSaveSheet(cur); });
-      root.querySelector('.root').appendChild(pill);
-    }
-    pill.__it = it;
-    pill.innerHTML = `${icon('download')} 저장 <kbd>Alt+S</kbd>`;
-    pill.hidden = false;
-    const r = fab.getBoundingClientRect();
-    pill.style.top = Math.max(8, r.top + r.height / 2 - 15) + 'px';
-    pill.style.right = Math.max(8, innerWidth - r.left + 8) + 'px';
+    pendingIt = it;
+    decorateBars();
   }
-  function hideSavePill() { if (pill) pill.hidden = true; }
+  function hideSavePill() {
+    if (pendingIt) pendingIt = null;
+    decorateBars();
+  }
+
+  /* ---------- NovelAI 도구 줄(핀 · 클립보드 · 저장) 끝에 우리 저장 버튼 ----------
+   * 1) 오른쪽 아래 도구 줄: 클래스 이름이 없어서 아이콘 파일로 찾음 (핀 · 클립보드 · 저장 중 2개 이상 있는 묶음)
+   * 2) 그림 위에 마우스를 올리면 나오는 줄 (.image-gen-save-bar, 여러 장 보기 등) */
+  const BAR_SEL = '.image-gen-save-bar';
+  const TOOL_ICONS = ['8a391c7b.svg', '579cb9e6.svg', '36b86afc.svg'];
+  let pendingIt = null;
+  let toolGroups = [];
+  const BAR_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="M12 10v6"/><path d="m9 13 3 3 3-3"/></svg>';
+  const iconFile = (d) => { const cs = getComputedStyle(d); return ((cs.maskImage || cs.webkitMaskImage || '').match(/[\w-]+\.svg/) || [''])[0]; };
+  function findToolGroups() {
+    if (toolGroups.length && toolGroups.every((g) => g.isConnected)) return toolGroups;
+    const hits = new Map();
+    document.querySelectorAll('button > div').forEach((d) => {
+      if (!TOOL_ICONS.includes(iconFile(d))) return;
+      const g = d.parentElement.parentElement && d.parentElement.parentElement.parentElement;
+      if (g) hits.set(g, (hits.get(g) || 0) + 1);
+    });
+    toolGroups = [...hits].filter(([, n]) => n >= 2).map(([g]) => g);
+    return toolGroups;
+  }
+  function makeBarButton(like, wrapLike, onClick) {
+    const b = like ? like.cloneNode(false) : document.createElement('button');
+    b.removeAttribute('disabled');
+    b.removeAttribute('aria-label');
+    b.type = 'button';
+    b.classList.add('nais-save');
+    b.title = 'NAI Studio · 폴더 · 이름 정해서 저장 (Alt+S)';
+    b.innerHTML = BAR_ICON;
+    b.style.color = '#e9c46a';
+    b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onClick(); });
+    if (!wrapLike) return b;
+    const w = wrapLike.cloneNode(false);
+    w.classList.add('nais-save-wrap');
+    w.appendChild(b);
+    return w;
+  }
+  function decorateBars() {
+    const pending = !!(pendingIt && pendingIt.status !== 'saved' && pendingIt.status !== 'saving');
+    for (const g of findToolGroups()) {
+      if (g.querySelector('.nais-save')) continue;
+      const wrap0 = [...g.children].find((c) => c.querySelector('button'));
+      if (!wrap0) continue;
+      g.appendChild(makeBarButton(wrap0.querySelector('button'), wrap0, () => saveFromImg(mainImage())));
+    }
+    document.querySelectorAll(BAR_SEL).forEach((bar) => {
+      if (bar.querySelector(':scope > .nais-save')) return;
+      const ref = [...bar.querySelectorAll('button')].pop();
+      bar.appendChild(makeBarButton(ref, null, () => saveFromImg(imageNear(bar))));
+    });
+    document.querySelectorAll('.nais-save').forEach((b) => { b.style.boxShadow = pending ? 'inset 0 0 0 1.5px #e9c46a' : ''; });
+    if (fab) fab.classList.toggle('unsaved', pending);
+  }
+  const genImgs = (root) => [...root.querySelectorAll('img')].filter((i) => /^(blob|data):/.test(i.src) && i.naturalWidth >= 256);
+  // 가운데 크게 떠 있는 그림 (화면에 그려진 크기가 제일 큰 것)
+  function mainImage() {
+    const area = (i) => { const r = i.getBoundingClientRect(); return r.width * r.height; };
+    return genImgs(document).sort((a, b) => area(b) - area(a))[0] || null;
+  }
+  // 마우스를 올린 그림의 줄이면 그 그림
+  function imageNear(bar) {
+    for (let el = bar.parentElement, k = 0; el && k < 8; el = el.parentElement, k++) {
+      const imgs = genImgs(el);
+      if (imgs.length) return imgs.sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight)[0];
+    }
+    return mainImage();
+  }
+  async function saveFromImg(img) {
+    if (!img) return openSaveSheet(R.items[0]);
+    let blob = null;
+    try { blob = await (await fetch(img.src)).blob(); } catch (e) {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        c.getContext('2d').drawImage(img, 0, 0);
+        blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+      } catch (err) { /* 못 읽음 */ }
+    }
+    if (!blob) return openSaveSheet(R.items[0]);
+    // 이번 접속에서 잡은 그림이면 그 기록(프롬프트 · 시드)을 그대로 씀
+    let it = R.items.find((x) => x.blob.size === blob.size);
+    if (!it) {
+      const kind = /webp/.test(blob.type) ? 'webp' : /jpe?g/.test(blob.type) ? 'jpeg' : 'png';
+      it = { id: uid(), blob, url: URL.createObjectURL(blob), w: img.naturalWidth, h: img.naturalHeight, kind, hash: '', meta: null, n: 1, t: Date.now(), status: 'idle', path: '', via: '' };
+      R.items.unshift(it);
+    }
+    openSaveSheet(it);
+  }
+  // 화면이 바뀔 때마다 (너무 자주는 말고) 다시 붙이기
+  let barTimer = 0;
+  new MutationObserver(() => {
+    if (barTimer) return;
+    barTimer = setTimeout(() => { barTimer = 0; if (document.body) decorateBars(); }, 300);
+  }).observe(document.documentElement, { childList: true, subtree: true });
 
   /* ---------- 골라서 저장 (폴더 · 이름 · 형식 정하기) ---------- */
   let lastPickDir = null;
@@ -632,7 +718,6 @@
   const FMT = { jpeg: ['JPG', 'jpg'], png: ['PNG', 'png'], webp: ['WebP', 'webp'] };
   async function openSaveSheet(it) {
     if (!it) { toast('아직 이번 접속에서 생성한 그림이 없어요', 'info'); return; }
-    if (pill && pill.__it === it) hideSavePill();
     if (!UI.open) togglePanel(true);
     const pnl = root.querySelector('.panel');
     pnl.querySelectorAll('.viewer').forEach((v) => v.remove());
@@ -1022,7 +1107,7 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
 .viewer .vimg{display:block;width:100%;background:var(--sheet);padding:6px 6px 18px;box-shadow:0 1px 3px rgba(60,40,10,.25)}
 .viewer .vmeta{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 2px}.viewer .vmeta span{font:11px/18px "IBM Plex Mono",Consolas,monospace;padding:0 6px;border:1px solid var(--line2);color:var(--mut);background:var(--sheet)}
 .viewer .sect.sub{margin-left:12px}
-.savepill{all:unset;position:fixed;z-index:2147483601;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;cursor:pointer;background:var(--panel);color:var(--fg);border:1.5px solid var(--fg);box-shadow:2px 2px 0 var(--acc-line);font:700 12.5px/1 var(--serif);transform:rotate(-1.5deg);animation:pillin .2s ease-out}.savepill[hidden]{display:none}.savepill svg{width:14px;height:14px;color:var(--acc)}.savepill kbd{font:500 10px/1 "IBM Plex Mono",Consolas,monospace;padding:2px 4px;border:1px solid var(--line2);color:var(--mut)}.savepill:hover{transform:rotate(0)}@keyframes pillin{from{opacity:0;transform:translateX(8px)}}
+.fab.unsaved::after{content:"";position:absolute;top:-5px;left:-5px;width:11px;height:11px;border-radius:50%;background:#e9c46a;box-shadow:0 0 0 2px var(--panel)}
 .pathin{display:flex;align-items:center;gap:4px}.pathin span{flex:none;font:12px "IBM Plex Mono",Consolas,monospace;color:var(--mut);max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pathin .in{flex:1;min-width:0;height:30px}
 .dchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;max-height:84px;overflow-y:auto}.dchips:empty{display:none}.dchips button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;font-size:11.5px;border:1px solid var(--line2);background:var(--sheet);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dchips button:hover{border-color:var(--acc);color:var(--acc)}.dchips svg{width:11px;height:11px;flex:none}.dchips small{color:var(--dim);font-size:10px}
 .savesheet .vf kbd{font:500 10px/1 "IBM Plex Mono",Consolas,monospace;padding:1px 4px;border:1px solid var(--on-line);margin-left:2px}
