@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "NAI Studio",
+  "version": "1.8.3",
+  "description": "노벨AI로 뽑은 그림이 내 폴더에 알아서 착착! 한글로 태그 쓰기, 치환어, 메타데이터 지우기까지 한 번에 도와줘요.",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "unlimitedStorage", "downloads", "offscreen"],
+  "host_permissions": [
+    "https://novelai.net/*",
+    "https://translate.googleapis.com/*",
+    "https://clients5.google.com/*"
+  ],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": {
+    "default_title": "NAI Studio",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+  },
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "content_scripts": [
+    {
+      "matches": ["https://novelai.net/*"],
+      "js": ["content/hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://novelai.net/*"],
+      "js": ["content/panel.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "commands": {
+    "open-studio": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "NAI Studio 열기"
+    }
+  }
+}

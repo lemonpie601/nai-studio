@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap">
+<style>
+  :root { color-scheme: light; --paper:#f4efe4; --panel:#fbf8f1; --line:#e0d7c5; --line2:#cbbfa8; --fg:#2b2925; --mut:#645d52; --dim:#9a9182; --acc: #33598e; --ok:#4c7a48; --on:#fbf8f1; --tape:rgba(222,199,128,.62);
+    --serif:"Gowun Batang","Nanum Myeongjo",Batang,"바탕",serif; --sheet:#fffdf8; --pri-hover:#3a3732; --acc-line:rgba(51,89,142,.42); --bad:#b8432f; --rule:rgba(160,140,105,.13); }
+  :root[data-theme="dark"] { color-scheme: dark; --paper:#1c1a17; --panel:#23211d; --line:#36322b; --line2:#4b463c; --fg:#ebe4d4; --mut:#b3aa96; --dim:#7f7766; --acc:#8fb0e3; --ok:#93c08a; --on:#1c1a17; --sheet:#2a2722; --pri-hover:#fff8ea; --acc-line:rgba(143,176,227,.5); --bad:#e27e64; --rule:rgba(235,228,212,.055); }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 300px; color: var(--fg); font: 13px/1.5 "Pretendard Variable", Pretendard, "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+    background: var(--paper) repeating-linear-gradient(transparent 0 25px, var(--rule) 25px 26px); }
+  svg { display: block; }
+  .wrap { padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 9px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 2px 10px; border-bottom: 1.5px solid var(--line2); margin-bottom: 2px; }
+  .logo { width: 26px; height: 26px; display: grid; place-items: center; color: var(--acc); border: 1.5px solid var(--acc); transform: rotate(-5deg); }
+  .logo svg { width: 13px; height: 13px; }
+  .brand b { font-family: var(--serif); font-size: 16px; font-weight: 700; display: block; line-height: 1.2; }
+  .brand small { font-family: var(--serif); font-style: italic; color: var(--dim); font-size: 11.5px; }
+  .card { padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(80,60,20,.08); display: flex; align-items: center; gap: 10px; }
+  #folder { cursor: pointer; }
+  #folder:hover { border-color: var(--line2); }
+  .card .ic { color: var(--mut); flex: none; }
+  .card .ic svg { width: 16px; height: 16px; stroke-width: 1.8; }
+  .card .t { flex: 1; min-width: 0; }
+  .card .a { font-family: var(--serif); font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .b { font-size: 12px; color: var(--mut); }
+  .card.warn { border: 1px dashed var(--bad); }
+  .card.warn .ic { color: var(--bad); }
+  .stat { display: grid; grid-template-columns: 1fr 1fr; border-top: 1.5px solid var(--fg); border-bottom: 1.5px solid var(--fg); }
+  .stat div { padding: 7px 4px; }
+  .stat div + div { border-left: 1px dashed var(--line2); padding-left: 12px; }
+  .stat small { display: block; color: var(--dim); font-family: var(--serif); font-size: 11.5px; }
+  .stat b { font-family: var(--serif); font-size: 21px; font-weight: 700; margin-right: 2px; }
+  .btn { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; height: 32px; border-radius: 3px;
+    background: var(--panel); border: 1px solid var(--line2); }
+  .btn:hover { background: var(--sheet); border-color: var(--mut); }
+  .btn.pri { color: var(--on); background: var(--fg); border-color: var(--fg); box-shadow: 2px 2px 0 var(--acc-line); height: 34px; margin-top: 3px; }
+  .btn.pri:hover { background: var(--pri-hover); }
+  .btn.sm { height: 30px; font-size: 12.5px; }
+  .btn svg { width: 15px; height: 15px; stroke-width: 1.8; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .sw { position: relative; width: 36px; height: 20px; flex: none; }
+  .sw input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .sw span { position: absolute; inset: 0; border-radius: 10px; border: 1.5px solid var(--mut); background: var(--panel); }
+  .sw span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--mut); transition: transform .15s; }
+  .sw input:checked + span { background: var(--fg); border-color: var(--fg); }
+  .sw input:checked + span::after { transform: translateX(16px); background: var(--on); }
+</style>
+</head>
+<body>
+  <div class="wrap" id="root"></div>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
