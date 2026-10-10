@@ -49,13 +49,13 @@ async function updateBadge() {
   if (folderPerm === 'prompt' && S.autoSave) {
     await chrome.action.setBadgeBackgroundColor({ color: '#fb7185' });
     await chrome.action.setBadgeText({ text: '!' });
-    await chrome.action.setTitle({ title: 'NAI Studio — 폴더 권한을 다시 허용해 주세요 (아이콘 클릭)' });
+    await chrome.action.setTitle({ title: 'NAI Folio — 폴더 권한을 다시 허용해 주세요 (아이콘 클릭)' });
     return;
   }
   const n = stats && stats.day === today() ? stats.count : 0;
   await chrome.action.setBadgeBackgroundColor({ color: '#b9a6ff' });
   await chrome.action.setBadgeText({ text: S.autoSave && n ? String(n > 999 ? '999+' : n) : '' });
-  await chrome.action.setTitle({ title: `NAI Studio — 자동 저장 ${S.autoSave ? 'ON' : 'OFF'} · 오늘 ${n}장` });
+  await chrome.action.setTitle({ title: `NAI Folio — 자동 저장 ${S.autoSave ? 'ON' : 'OFF'} · 오늘 ${n}장` });
 }
 // 기록 · 사전이 바뀌면 잠깐 모았다가 폴더 _백업 에도 저장
 let backupTimer = null;

@@ -420,7 +420,7 @@
       reg.set(HL_BAD, new Highlight(...bad));
       updateBadge();
     } catch (e) {
-      console.warn('[NAI Studio] 치환어 표시 실패', e);
+      console.warn('[NAI Folio] 치환어 표시 실패', e);
     }
   }
   function updateBadge() {
@@ -595,7 +595,7 @@
       if (!r.dup) {
         sessionSaved++;
         updateChrome();
-        if (r.via === 'folder') toast(`저장됨 · ${folder.name || '폴더'}/${r.path}`, 'ok', 2200);
+        if (r.via === 'folder') { libDirty = true; toast(`저장됨 · ${folder.name || '폴더'}/${r.path}`, 'ok', 2200); }
         else if (r.fallbackReason === 'perm') toast('폴더 권한이 꺼져 있어서 다운로드 폴더에 저장했어요. 툴바 아이콘을 눌러 다시 허용해 주세요', 'err', 4500);
         else toast(`다운로드 폴더에 저장 · ${r.path}`, 'ok', 2200);
       }
@@ -644,7 +644,7 @@
     b.removeAttribute('aria-label');
     b.type = 'button';
     b.classList.add('nais-save');
-    b.title = 'NAI Studio · 폴더 · 이름 정해서 저장 (Alt+S)';
+    b.title = 'NAI Folio · 폴더 · 이름 정해서 저장 (Alt+S)';
     b.innerHTML = BAR_ICON;
     b.style.color = '#e9c46a';
     b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onClick(); });
@@ -734,8 +734,9 @@
     const dirs = tg.dirs || [];
     const startDir = lastPickDir != null ? lastPickDir : tg.subdir;
     v.querySelector('.vb').innerHTML = `<img class="vimg" src="${it.url}" alt="" style="max-height:210px;object-fit:contain">
-      <div class="lbl" style="margin-top:12px">폴더 ${tip('비우면 맨 위에 저장해요. 없는 폴더는 새로 만들어요. / 로 나누면 폴더 안의 폴더')}</div>
+      <div class="lbl" style="margin-top:12px">폴더 ${tip('비우면 맨 위에 저장해요. 없는 폴더는 새로 만들어요. / 로 나누면 폴더 안의 폴더')}<span class="grow"></span><button class="btn sm" data-s="newdir" title="지금 폴더 안에 새 폴더 만들기">${icon('plus')} 새 폴더</button></div>
       <div class="pathin"><span>${esc(base)}</span><input class="in" data-s="dir" value="${esc(startDir)}" placeholder="(맨 위)" spellcheck="false"></div>
+      <div class="newhint" data-s="newhint" hidden></div>
       <div class="dchips" data-s="chips"></div>
       <div class="lbl" style="margin-top:10px">파일 이름</div>
       <div class="pathin"><input class="in" data-s="name" value="${esc(tg.name)}" spellcheck="false"><span data-s="ext">${extOf()}</span></div>
@@ -753,7 +754,16 @@
         .filter((d) => !q || d.toLowerCase().includes(q) && d.toLowerCase() !== q).slice(0, 12);
       chips.innerHTML = list.map((d) => `<button data-dir="${esc(d)}" title="${esc(d)}">${icon('folder')}${esc(d)}${d === tg.subdir ? ' <small>규칙</small>' : d === lastPickDir ? ' <small>지난번</small>' : ''}</button>`).join('');
     };
+    // 아직 없는 폴더면 '새로 만들어요' 표시
+    const hint = v.querySelector('[data-s="newhint"]');
+    const updHint = () => {
+      const d = dirIn.value.trim().replace(/^\/+|\/+$/g, '');
+      const isNew = !!d && !dirs.includes(d);
+      hint.hidden = !isNew;
+      if (isNew) hint.innerHTML = `${icon('folder')} 새 폴더로 만들어요 · <b>${esc(d)}</b>`;
+    };
     drawChips();
+    updHint();
     nameIn.focus();
     nameIn.select();
     const doSave = async () => {
@@ -765,14 +775,14 @@
       v.remove();
       await saveItem(it, true, { subdir, name, mode });
     };
-    dirIn.addEventListener('input', () => { typed = true; drawChips(); });
+    dirIn.addEventListener('input', () => { typed = true; drawChips(); updHint(); });
     v.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.preventDefault(); v.remove(); }
       else if (e.key === 'Enter' && !e.isComposing && e.target.tagName === 'INPUT') { e.preventDefault(); doSave(); }
     });
     v.addEventListener('click', (e) => {
       const c = e.target.closest('[data-dir]');
-      if (c) { dirIn.value = c.dataset.dir; nameIn.focus(); return; }
+      if (c) { dirIn.value = c.dataset.dir; updHint(); nameIn.focus(); return; }
       const m = e.target.closest('[data-m]');
       if (m) {
         mode = m.dataset.m;
@@ -784,7 +794,18 @@
       if (!b) return;
       if (b.dataset.s === 'close') v.remove();
       else if (b.dataset.s === 'save') doSave();
-      else if (b.dataset.s === 'default') { dirIn.value = tg.subdir; nameIn.value = tg.name; drawChips(); }
+      else if (b.dataset.s === 'default') { dirIn.value = tg.subdir; nameIn.value = tg.name; drawChips(); updHint(); }
+      else if (b.dataset.s === 'newdir') {
+        // 지금 칸에 있는 폴더 안에 새 이름을 바로 이어 쓸 수 있게
+        const cur = dirIn.value.trim().replace(/\/+$/, '');
+        dirIn.value = cur ? cur + '/' : '';
+        dirIn.placeholder = '새 폴더 이름';
+        typed = true;
+        drawChips();
+        updHint();
+        dirIn.focus();
+        dirIn.setSelectionRange(dirIn.value.length, dirIn.value.length);
+      }
     });
   }
 
@@ -1109,6 +1130,7 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
 .viewer .sect.sub{margin-left:12px}
 .fab.unsaved::after{content:"";position:absolute;top:-5px;left:-5px;width:11px;height:11px;border-radius:50%;background:#e9c46a;box-shadow:0 0 0 2px var(--panel)}
 .pathin{display:flex;align-items:center;gap:4px}.pathin span{flex:none;font:12px "IBM Plex Mono",Consolas,monospace;color:var(--mut);max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pathin .in{flex:1;min-width:0;height:30px}
+.newhint{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:12px;color:var(--acc);font-family:var(--serif)}.newhint[hidden]{display:none}.newhint svg{width:12px;height:12px}.newhint b{font-family:"IBM Plex Mono",Consolas,monospace;font-weight:500;font-size:11.5px}
 .dchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;max-height:84px;overflow-y:auto}.dchips:empty{display:none}.dchips button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;font-size:11.5px;border:1px solid var(--line2);background:var(--sheet);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dchips button:hover{border-color:var(--acc);color:var(--acc)}.dchips svg{width:11px;height:11px;flex:none}.dchips small{color:var(--dim);font-size:10px}
 .savesheet .vf kbd{font:500 10px/1 "IBM Plex Mono",Consolas,monospace;padding:1px 4px;border:1px solid var(--on-line);margin-left:2px}
 .viewer .vf{display:flex;gap:4px;padding:10px 12px;border-top:1.5px solid var(--line2);flex-wrap:wrap}
@@ -1165,11 +1187,11 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
     const wrap = document.createElement('div');
     wrap.className = 'root';
     wrap.innerHTML = `
-      <button class="fab" title="NAI Studio (Alt+N)">${icon('sparkle', true)}<span class="badge"></span><span class="dot"></span></button>
+      <button class="fab" title="NAI Folio (Alt+N)">${icon('sparkle', true)}<span class="badge"></span><span class="dot"></span></button>
       <section class="panel" hidden>
         <header class="hd">
           <div class="logo">${icon('sparkle', true)}</div>
-          <div class="grow"><div class="ttl">NAI Studio</div><div class="sub" data-r="sub"></div></div>
+          <div class="grow"><div class="ttl">NAI Folio</div><div class="sub" data-r="sub"></div></div>
           <button class="ib" data-act="theme" title="밝은 노트 / 밤 노트"></button>
           <button class="btn sm" data-act="studio" title="큰 화면 스튜디오 열기 (Alt+Shift+S)">${icon('external')} 스튜디오</button>
           <button class="ib" data-act="close" title="닫기 (Alt+N)">${icon('x')}</button>
@@ -1326,9 +1348,24 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
       else if (b) b.remove();
     }
   }
+  let libDirty = false, libTimer = 0;
   function refreshTab(name) {
     updateChrome();
-    if (UI.open && UI.tab === name && bd) renderTab();
+    if (!(UI.open && UI.tab === name && bd)) return;
+    if (name !== 'recent') return renderTab();
+    // 내 폴더 보기: 새로 저장된 게 있을 때만 목록만 조용히 다시 읽음 (스크롤 · 검색칸 그대로)
+    if (LIB.mode === 'folder') {
+      if (!libDirty) return;
+      clearTimeout(libTimer);
+      libTimer = setTimeout(() => { libDirty = false; loadLib(true, true, true); }, 500);
+      return;
+    }
+    // 이번 접속 보기: 다시 그리되 스크롤 유지, 작업 이름 칸에 쓰는 중이면 잠깐 미룸
+    const a = root.activeElement;
+    if (a && a.tagName === 'INPUT' && bd.contains(a)) { clearTimeout(libTimer); libTimer = setTimeout(() => refreshTab(name), 800); return; }
+    const y = bd.scrollTop;
+    renderTab();
+    bd.scrollTop = y;
   }
   function renderTab() {
     root.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === UI.tab));
@@ -1715,6 +1752,7 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
       <div data-r="libbody"></div>`;
     renderLibBody();
     if (!LIB.items.length && !LIB.loading && !LIB.err) loadLib(true);
+    else if (libDirty) { libDirty = false; loadLib(true, true, true); } // 다른 화면에 있는 동안 저장된 그림
     bd.onkeydown = null;
     bd.onchange = null;
     bd.oninput = (e) => {
@@ -1754,7 +1792,7 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
     const box = bd.querySelector('[data-r="libbody"]');
     if (!box) return;
     if (LIB.err) {
-      const msg = { nofolder: '아직 폴더를 연결하지 않았어요', perm: '폴더 권한이 꺼져 있어요 · 툴바의 NAI Studio 아이콘을 눌러 허용해 주세요', invalidated: '확장 프로그램이 업데이트됐어요 · 페이지를 새로고침해 주세요' }[LIB.err] || '폴더를 읽지 못했어요: ' + LIB.err;
+      const msg = { nofolder: '아직 폴더를 연결하지 않았어요', perm: '폴더 권한이 꺼져 있어요 · 툴바의 NAI Folio 아이콘을 눌러 허용해 주세요', invalidated: '확장 프로그램이 업데이트됐어요 · 페이지를 새로고침해 주세요' }[LIB.err] || '폴더를 읽지 못했어요: ' + LIB.err;
       box.innerHTML = `<div class="empty">${icon('folder')}${esc(msg)}${LIB.err === 'nofolder' ? `<br><button class="btn sm" data-act="studio" style="margin-top:10px">스튜디오에서 연결하기</button>` : ''}</div>`;
       return;
     }
@@ -1769,12 +1807,14 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
         : `<div class="empty">${icon('image')}${LIB.q ? '검색 결과가 없어요' : '이 폴더엔 사진이 없어요'}</div>`}
       ${LIB.items.length < LIB.total ? `<button class="btn wide" data-act="libMore" style="margin-top:10px" ${LIB.loading ? 'disabled' : ''}>${LIB.loading ? '불러오는 중…' : `더 보기 (${LIB.total - LIB.items.length})`}</button>` : ''}`;
   }
-  async function loadLib(reset, fresh) {
-    if (LIB.loading) return;
+  async function loadLib(reset, fresh, keep) {
+    if (LIB.loading) { if (keep) LIB.again = true; return; }
     LIB.loading = true;
-    if (reset) LIB.items = [];
-    renderLibBody();
-    const r = await send({ type: 'lib', op: 'list', dir: LIB.dir, q: LIB.q.trim(), offset: LIB.items.length, limit: 24, fresh: !!fresh, day: LIB.day, scope: LIB.scope });
+    const want = keep ? Math.max(24, LIB.items.length) : 24;
+    if (reset && !keep) LIB.items = [];
+    if (!keep) renderLibBody();
+    const onLatest = keep && LIB.day && LIB.day === (LIB.days || [])[0];
+    const r = await send({ type: 'lib', op: 'list', dir: LIB.dir, q: LIB.q.trim(), offset: reset ? 0 : LIB.items.length, limit: reset ? want : 24, fresh: !!fresh, day: onLatest ? '' : LIB.day, scope: LIB.scope });
     LIB.loading = false;
     if (!r.ok) LIB.err = r.reason || r.error || '오류';
     else {
@@ -1786,7 +1826,8 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
       LIB.day = r.day || '';
       LIB.items = reset ? r.items : LIB.items.concat(r.items);
     }
-    if (UI.tab === 'recent' && LIB.mode === 'folder') renderLibBody(); // 패널을 닫았다 열어도 결과가 보이게
+    if (UI.tab === 'recent' && LIB.mode === 'folder') { const y = bd.scrollTop; renderLibBody(); bd.scrollTop = y; } // 패널을 닫았다 열어도 결과가 보이게
+    if (LIB.again) { LIB.again = false; loadLib(true, true, true); }
   }
   // 크게 보기 (패널 안에 겹쳐서)
   async function openViewer(p) {
@@ -1834,7 +1875,7 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
       <div class="hero ${warn ? 'warn' : ''}">
         <div class="ic">${icon(warn ? 'alert' : 'folder')}</div>
         <div class="grow"><div class="t1">${warn ? '폴더 권한이 필요해요' : '자동 저장'}</div>
-          <div class="t2">${warn ? '지금은 다운로드 폴더에 대신 저장 중 · 툴바의 NAI Studio 아이콘을 눌러 허용' : S.autoSave ? `${where} · ${S.saveMode === 'convert' ? '메타 제거 ' + ({ jpeg: 'JPG', webp: 'WebP' }[S.convFormat] || 'PNG') : '원본 PNG'}` : '꺼짐 · 아래 그림을 눌러 골라서 저장 (Alt+S 최근 그림)'}</div></div>
+          <div class="t2">${warn ? '지금은 다운로드 폴더에 대신 저장 중 · 툴바의 NAI Folio 아이콘을 눌러 허용' : S.autoSave ? `${where} · ${S.saveMode === 'convert' ? '메타 제거 ' + ({ jpeg: 'JPG', webp: 'WebP' }[S.convFormat] || 'PNG') : '원본 PNG'}` : '꺼짐 · 아래 그림을 눌러 골라서 저장 (Alt+S 최근 그림)'}</div></div>
         ${sw('autoSave', S.autoSave)}
       </div>
       ${!folder.name ? `<button class="btn wide" data-act="studio">${icon('folder')} 내 폴더 연결하기 (스튜디오)</button>` : ''}
@@ -1910,7 +1951,7 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
       <button class="btn wide" data-act="studio">${icon('sliders')} 폴더 · 파일 이름 · 변환 설정은 스튜디오에서</button>
       <div class="tip"><kbd>Alt</kbd>+<kbd>N</kbd> 패널 · <kbd>Alt</kbd>+<kbd>Q</kbd> 선택 번역 · <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd> 칸 전체 번역 · <kbd>${esc(TG())}</kbd> 치환어 목록 · <kbd>Alt</kbd>+<kbd>E</kbd> 치환어 펼쳐 보기 · <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> 스튜디오</div>
       <div class="cnt" data-r="diag">마지막 생성 요청: ${lastGen ? `${esc(lastGen.url)} · ${esc(lastGen.kind)}` : '아직 없음'} ${tip('치환이 안 될 때 이 줄을 알려 주세요. 어떤 주소 · 형식으로 보내는지 보여줘요.')}</div>
-      <div class="cnt" data-r="ver" style="text-align:right">NAI Studio v${esc(isAlive() ? chrome.runtime.getManifest().version : '?')}</div>`;
+      <div class="cnt" data-r="ver" style="text-align:right">NAI Folio v${esc(isAlive() ? chrome.runtime.getManifest().version : '?')}</div>`;
     bd.onchange = (e) => {
       const k = e.target.dataset.k;
       if (k) { setS({ [k]: e.target.checked }); if (k === 'snipExpand' || k === 'pngOnly') setTimeout(postCfg, 50); }

@@ -100,7 +100,7 @@ async function savePatch(p) {
 function renderShell() {
   $('#app').innerHTML = `<div class="app">
     <aside class="nav">
-      <div class="brand"><div class="logo">${icon('sparkle', true)}</div><div class="grow"><b>NAI Studio</b><small>작업 노트 · v${chrome.runtime.getManifest().version}</small></div><button class="ib" id="themeBtn"></button></div>
+      <div class="brand"><div class="logo">${icon('sparkle', true)}</div><div class="grow"><b>NAI Folio</b><small>작업 노트 · v${chrome.runtime.getManifest().version}</small></div><button class="ib" id="themeBtn"></button></div>
       ${Object.entries(VIEWS).map(([k, v]) => `<button class="navi" data-v="${k}" title="${v.label}">${icon(v.icon)}<span>${v.label}</span><span class="n" data-n="${k}"></span></button>`).join('')}
       <div class="spacer"></div>
       <div id="side"></div>
@@ -1965,7 +1965,7 @@ function viewSettings() {
           if (!m || !(m.prompt || m.neg)) continue;
           out.push({ path: r.path, savedAt: new Date(r.mtime).toISOString(), prompt: m.prompt || '', characters: m.chars || [], negative: m.neg || '', seed: m.seed, steps: m.steps, scale: m.scale, sampler: m.sampler, width: m.w, height: m.h, model: m.model || undefined, request: m.raw });
         }
-        const data = JSON.stringify({ app: 'NAI Studio', format: 1, folder: F.root.name, exportedAt: new Date().toISOString(), count: out.length, images: out }, null, 2);
+        const data = JSON.stringify({ app: 'NAI Folio', format: 1, folder: F.root.name, exportedAt: new Date().toISOString(), count: out.length, images: out }, null, 2);
         await downloadBlob(new Blob([data], { type: 'application/json' }), `NAI_생성정보_전체_${X.stamp()}.json`);
         toast(`${out.length}장의 생성 정보를 한 파일로 저장했어요`, 'ok');
       }

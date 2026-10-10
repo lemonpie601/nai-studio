@@ -13,7 +13,7 @@ async function render() {
   const warn = handle && perm !== 'granted';
 
   root.innerHTML = `
-    <div class="brand"><div class="logo">${icon('sparkle', true)}</div><div><b>NAI Studio</b><small>작업 노트</small></div></div>
+    <div class="brand"><div class="logo">${icon('sparkle', true)}</div><div><b>NAI Folio</b><small>작업 노트</small></div></div>
     <div class="card">
       <div class="ic">${icon('download')}</div>
       <div class="t"><div class="a">자동 저장</div><div class="b">${S.autoSave ? (S.saveMode === 'convert' ? '메타 제거 ' + ({ jpeg: 'JPG', webp: 'WebP' }[S.convFormat] || 'PNG') : '원본 PNG') : '꺼짐'}</div></div>

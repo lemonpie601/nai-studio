@@ -1,4 +1,4 @@
-// NAI Studio 공용 모듈 — background(서비스 워커) · offscreen · studio · popup 에서 import
+// NAI Folio 공용 모듈 — background(서비스 워커) · offscreen · studio · popup 에서 import
 // (content script 는 모듈을 못 쓰므로 content/panel.js 에 필요한 부분만 따로 있음)
 
 /* ------------------------------------------------------------------ *
@@ -661,7 +661,7 @@ function fmtDateTime(t) {
 export function sidecarJSON(meta, imageName, t) {
   const m = meta || {};
   const o = {
-    app: 'NAI Studio',
+    app: 'NAI Folio',
     format: 1,
     image: imageName,
     savedAt: new Date(t || Date.now()).toISOString(),
@@ -694,7 +694,7 @@ export async function writeSidecars(dir, imageName, meta, t, fmt) {
 }
 export function parseSidecarJSON(text) {
   const j = JSON.parse(text);
-  if (j && (j.app === 'NAI Studio' || 'negative' in j)) {
+  if (j && (j.app === 'NAI Folio' || j.app === 'NAI Studio' || 'negative' in j)) { // 예전 이름으로 만든 파일도
     return { prompt: j.prompt || '', neg: j.negative || '', chars: j.characters || [], seed: j.seed, steps: j.steps, scale: j.scale, sampler: j.sampler, w: j.width, h: j.height, model: j.model || '', raw: j.request, source: 'sidecar' };
   }
   // NovelAI Comment 형식을 그대로 저장해 둔 경우
