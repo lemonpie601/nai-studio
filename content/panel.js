@@ -1,8 +1,22 @@
 // NovelAI 페이지 위에 뜨는 작은 패널 (isolated world)
 (() => {
   'use strict';
-  if (window.__naiStudioPanel) return;
-  window.__naiStudioPanel = true;
+  // 이미 살아 있는 패널이 있으면 그만. 확장 프로그램이 다시 켜져서 끊긴 옛 패널이면 치우고 새로 붙음
+  const prev = window.__naiStudioPanel;
+  if (prev && prev.alive && prev.alive()) return; // (예전 버전이 남긴 true 는 업데이트로 이미 끊긴 것)
+  let reopenPanel = false;
+  // 옛 패널은 지우면 스스로 다시 붙으므로(예전 버전), 숨긴 상자 안으로 치워 둠
+  const retireOld = () => document.querySelectorAll('#nai-studio-host').forEach((h) => {
+    const p = h.shadowRoot && h.shadowRoot.querySelector('.panel');
+    if (p && !p.hidden) reopenPanel = true;
+    let box = document.getElementById('nai-studio-retired');
+    if (!box) { box = document.createElement('div'); box.id = 'nai-studio-retired'; box.style.cssText = 'display:none!important'; document.documentElement.appendChild(box); }
+    h.id = 'nai-studio-old';
+    box.appendChild(h);
+  });
+  retireOld();
+  document.querySelectorAll('.nais-save').forEach((b) => (b.closest('.nais-save-wrap') || b).remove());
+  window.__naiStudioPanel = { alive: () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; } } };
 
   /* ------------------------------------------------------------------ *
    * 확장 프로그램과 통신
@@ -32,6 +46,8 @@
   }
   // 확장 프로그램을 새로고침(업데이트)하면 이미 열려 있던 페이지는 연결이 끊김 → 저장이 조용히 실패함
   const isAlive = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; } };
+  // 확장 프로그램이 다시 켜지면 이 패널은 끊김 → 새 패널이 대신 들어오므로, 끊긴 쪽은 손 떼기
+  const live = (fn) => function (...a) { if (!isAlive()) return undefined; return fn.apply(this, a); };
   // 진짜 끊겼을 때만 '새로고침' 안내. 연결이 살아 있으면 잠깐 실패한 거라 짧게만 알림
   const deadToast = () => { if (isAlive()) toast('잠깐 실패했어요. 한 번 더 해 주세요', 'err', 2200); else showDead(); };
   function showDead() {
@@ -356,10 +372,10 @@
   }
   let acTimer = 0;
   const acSchedule = () => { clearTimeout(acTimer); acTimer = setTimeout(acUpdate, 0); };
-  document.addEventListener('input', acSchedule, true);
-  document.addEventListener('selectionchange', () => { if (AC.open) acSchedule(); });
+  document.addEventListener('input', live(acSchedule), true);
+  document.addEventListener('selectionchange', live(() => { if (AC.open) acSchedule(); }));
   document.addEventListener('focusout', (e) => { if (!host || !e.composedPath().includes(host)) setTimeout(() => { if (!editableRoot(document.activeElement)) acClose(); }, 0); }, true);
-  window.addEventListener('resize', acClose);
+  window.addEventListener('resize', live(acClose));
   function acKey(e) {
     if (!AC.open || e.isComposing || e.keyCode === 229) return false;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -461,12 +477,12 @@
     badge.style.top = Math.max(4, r.top - 9) + 'px';
   }
   const hlSchedule = () => { clearTimeout(hlTimer); hlTimer = setTimeout(refreshHighlights, 120); };
-  document.addEventListener('input', hlSchedule, true);
-  document.addEventListener('focusin', hlSchedule, true);
+  document.addEventListener('input', live(hlSchedule), true);
+  document.addEventListener('focusin', live(hlSchedule), true);
   document.addEventListener('focusout', () => setTimeout(updateBadge, 0), true);
-  window.addEventListener('resize', hlSchedule);
+  window.addEventListener('resize', live(hlSchedule));
   window.addEventListener('scroll', () => { if (badge && !badge.hidden) updateBadge(); }, true);
-  setInterval(() => { if (!document.hidden) refreshHighlights(); }, 2000); // NovelAI 가 칸 내용을 직접 바꿨을 때 대비
+  setInterval(live(() => { if (!document.hidden) refreshHighlights(); }), 2000); // NovelAI 가 칸 내용을 직접 바꿨을 때 대비
 
   /* ---------- 생성 버튼을 누르는 순간: 칸에서 잠깐 펼쳤다가 되돌림 ----------
      NovelAI 요청 형식이 바뀌어도(V5 등) 칸 내용을 그대로 읽어 가니 확실하게 펼쳐짐 */
@@ -520,6 +536,7 @@
   }
   // 마우스: 버튼을 누르는 순간(click 보다 먼저) 펼쳐 둠
   document.addEventListener('pointerdown', (e) => {
+    if (!isAlive()) return;
     if (e.button !== 0 || !e.isTrusted) return;
     if (genButtonOf(e.composedPath()[0]) && hasKnownTokens()) expandFieldsForGenerate();
   }, true);
@@ -564,6 +581,7 @@
   let sessionSaved = 0;
 
   window.addEventListener('message', async (e) => {
+    if (!isAlive()) return;
     const d = e.data;
     if (e.source !== window || !d || d.__naiStudio !== 1 || d.from !== 'hook') return;
     if (d.type === 'gen') {
@@ -636,6 +654,7 @@
   const TOOL_ICONS = ['8a391c7b.svg', '579cb9e6.svg', '36b86afc.svg'];
   let pendingIt = null;
   let toolGroups = [];
+  const ME = Math.random().toString(36).slice(2); // 이 패널이 붙인 버튼 표시 (끊긴 옛 패널 버튼과 구분)
   const BAR_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="M12 10v6"/><path d="m9 13 3 3 3-3"/></svg>';
   const iconFile = (d) => { const cs = getComputedStyle(d); return ((cs.maskImage || cs.webkitMaskImage || '').match(/[\w-]+\.svg/) || [''])[0]; };
   function findToolGroups() {
@@ -655,6 +674,7 @@
     b.removeAttribute('aria-label');
     b.type = 'button';
     b.classList.add('nais-save');
+    b.dataset.owner = ME;
     b.title = 'NAI Folio · 폴더 · 이름 정해서 저장 (Alt+S)';
     b.innerHTML = BAR_ICON;
     b.style.color = '#e9c46a';
@@ -667,6 +687,8 @@
   }
   function decorateBars() {
     const pending = !!(pendingIt && pendingIt.status !== 'saved' && pendingIt.status !== 'saving');
+    // 끊긴 옛 패널이 붙여 둔 버튼은 눌러도 동작 안 하니 치움
+    document.querySelectorAll('.nais-save').forEach((b) => { if (b.dataset.owner !== ME) (b.closest('.nais-save-wrap') || b).remove(); });
     for (const g of findToolGroups()) {
       if (g.querySelector('.nais-save')) continue;
       const wrap0 = [...g.children].find((c) => c.querySelector('button'));
@@ -719,7 +741,7 @@
   // 화면이 바뀔 때마다 (너무 자주는 말고) 다시 붙이기
   let barTimer = 0;
   new MutationObserver(() => {
-    if (barTimer) return;
+    if (barTimer || !isAlive()) return;
     barTimer = setTimeout(() => { barTimer = 0; if (document.body) decorateBars(); }, 300);
   }).observe(document.documentElement, { childList: true, subtree: true });
 
@@ -836,6 +858,7 @@
     return null;
   }
   document.addEventListener('focusin', (e) => {
+    if (!isAlive()) return;
     const path = e.composedPath();
     if (host && path.includes(host)) return;
     const r = editableRoot(path[0]);
@@ -1273,7 +1296,8 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
     updateChrome();
     const tick = () => {
       host.style.display = location.pathname.startsWith('/image') ? '' : 'none';
-      if (!host.isConnected) document.documentElement.appendChild(host);
+      // NovelAI 가 지워도 다시 붙임 — 단, 끊긴 옛 패널은 새 패널에 자리를 넘겨줌
+      if (!host.isConnected && isAlive()) document.documentElement.appendChild(host);
     };
     tick();
     setInterval(tick, 1000);
@@ -1983,6 +2007,7 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
    * 단축키
    * ------------------------------------------------------------------ */
   window.addEventListener('keydown', (e) => {
+    if (!isAlive()) return;
     if (acKey(e)) return;
     if (onGenKey(e)) return;
     if (!e.altKey || e.ctrlKey || e.metaKey) return;
@@ -2032,6 +2057,7 @@ kbd{font:500 10.5px/1 var(--mono);padding:2px 5px;border-radius:2px;background:v
       }
     } catch (e) { /* noop */ }
     buildUI();
+    if (reopenPanel) togglePanel(true); // 끊긴 옛 패널이 열려 있었으면 이어서
   }
   if (document.body) init();
   else document.addEventListener('DOMContentLoaded', init, { once: true });

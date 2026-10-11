@@ -242,6 +242,18 @@ chrome.runtime.onInstalled.addListener((d) => {
 });
 chrome.runtime.onStartup.addListener(updateBadge);
 
+// 확장 프로그램이 다시 켜지면(업데이트 · ↻ · 크롬이 알아서 다시 띄움) 이미 열려 있던 NovelAI 탭의 패널은 연결이 끊김
+// → 그 탭들에 패널을 다시 붙여서 새로고침 없이 계속 쓰게 함. (서비스 워커가 잠깐 잤다 깬 건 session 기록으로 구분)
+(async () => {
+  try {
+    const { panelsAttached } = await chrome.storage.session.get('panelsAttached');
+    if (panelsAttached) return;
+    await chrome.storage.session.set({ panelsAttached: true });
+    const tabs = await chrome.tabs.query({ url: chrome.runtime.getManifest().content_scripts[0].matches });
+    for (const t of tabs) chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['content/panel.js'] }).catch(() => {});
+  } catch (e) { /* 붙이지 못하면 패널의 새로고침 안내로 */ }
+})();
+
 // 1.6.9: 이미지마다 만드는 정보 파일은 기본 꺼짐으로 — 예전 버전에서 저장된 '둘 다' 설정도 한 번만 끔
 (async () => {
   const { settings } = await chrome.storage.local.get('settings');
