@@ -8,7 +8,7 @@
    * 확장 프로그램과 통신
    * ------------------------------------------------------------------ */
   let alive = true;
-  function send(msg) {
+  function sendOnce(msg) {
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendMessage(msg, (r) => {
@@ -16,17 +16,28 @@
           else resolve(r || { ok: false, error: '응답 없음' });
         });
       } catch (e) {
-        alive = false;
-        resolve({ ok: false, error: 'invalidated' });
+        resolve({ ok: false, error: isAlive() ? String((e && e.message) || e) : 'invalidated' });
       }
     });
   }
+  // 확장 프로그램 쪽(서비스 워커)이 잠들었다 깨는 중이면 응답이 늦거나 끊길 수 있어서 한 번 더
+  async function send(msg) {
+    let r = await sendOnce(msg);
+    if (!r.ok && r.error !== 'invalidated' && /Receiving end|message port closed|응답 없음|Could not establish/i.test(String(r.error || ''))) {
+      await new Promise((ok) => setTimeout(ok, 300));
+      r = await sendOnce(msg);
+    }
+    if (r.error === 'invalidated') alive = false;
+    return r;
+  }
   // 확장 프로그램을 새로고침(업데이트)하면 이미 열려 있던 페이지는 연결이 끊김 → 저장이 조용히 실패함
   const isAlive = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; } };
-  const deadToast = () => showDead();
+  // 진짜 끊겼을 때만 '새로고침' 안내. 연결이 살아 있으면 잠깐 실패한 거라 짧게만 알림
+  const deadToast = () => { if (isAlive()) toast('잠깐 실패했어요. 한 번 더 해 주세요', 'err', 2200); else showDead(); };
   function showDead() {
+    if (isAlive()) return;
     alive = false;
-    toast('연결이 끊겨서 저장하지 못했어요. 새로고침해 주세요', 'err', 4000);
+    toast('확장 프로그램이 새로 켜져서 연결이 끊겼어요. 새로고침해 주세요', 'err', 4000);
     const pnl = root && root.querySelector('.panel');
     if (!pnl || pnl.querySelector('.dead')) return;
     const bar = document.createElement('div');
@@ -45,7 +56,7 @@
   }
   async function sset(o) {
     if (!isAlive()) { showDead(); throw new Error('invalidated'); }
-    try { await chrome.storage.local.set(o); } catch (e) { showDead(); throw e; }
+    try { await chrome.storage.local.set(o); } catch (e) { deadToast(); throw e; }
   }
 
   const DEFAULTS = { autoSave: true, saveMode: 'original', pngOnly: true, snipExpand: true, snipTrigger: '%', theme: 'auto', autoIns: false, tagMode: true, lowercase: true, stripArticles: true, convFormat: 'webp' };
