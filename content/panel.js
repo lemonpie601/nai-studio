@@ -666,7 +666,25 @@
       if (g) hits.set(g, (hits.get(g) || 0) + 1);
     });
     toolGroups = [...hits].filter(([, n]) => n >= 2).map(([g]) => g);
+    if (!toolGroups.length) toolGroups = findToolGroupsByShape();
     return toolGroups;
+  }
+  // NovelAI 가 업데이트돼서 아이콘 파일 이름이 바뀌었을 때: 글자 없는 아이콘 버튼이 3개 이상 모인 오른쪽 아래 묶음
+  const isIconBtn = (b) => !b.textContent.trim() && !b.closest('.nais-save-wrap') &&
+    (!!b.querySelector('svg') || [...b.querySelectorAll('div')].some((d) => /url\(/.test(getComputedStyle(d).maskImage || getComputedStyle(d).webkitMaskImage || '')));
+  function findToolGroupsByShape() {
+    const hits = new Map();
+    document.querySelectorAll('button').forEach((b) => {
+      if (host && host.contains(b)) return;
+      const g = b.parentElement && b.parentElement.parentElement;
+      if (!g || hits.has(g)) return;
+      const wraps = [...g.children].filter((c) => !c.classList.contains('nais-save-wrap'));
+      const btns = wraps.map((c) => c.querySelector(':scope > button')).filter(Boolean);
+      if (btns.length < 3 || btns.length > 4 || btns.length !== wraps.length || !btns.every(isIconBtn)) { hits.set(g, false); return; }
+      const r = g.getBoundingClientRect();
+      hits.set(g, r.width > 0 && r.top > innerHeight * 0.5 && r.left > innerWidth * 0.4);
+    });
+    return [...hits].filter(([, ok]) => ok).map(([g]) => g);
   }
   function makeBarButton(like, wrapLike, onClick) {
     const b = like ? like.cloneNode(false) : document.createElement('button');
