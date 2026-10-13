@@ -751,16 +751,19 @@
   const FMT = { jpeg: ['JPG', 'jpg'], png: ['PNG', 'png'], webp: ['WebP', 'webp'] };
   async function openSaveSheet(it) {
     if (!it) { toast('아직 이번 접속에서 생성한 그림이 없어요', 'info'); return; }
-    if (!UI.open) togglePanel(true);
+    // 패널이 닫혀 있다가 이 창 때문에 열린 거면, 저장 · 닫기 때 패널도 같이 닫음
+    const autoOpened = !UI.open;
+    if (autoOpened) togglePanel(true);
     const pnl = root.querySelector('.panel');
     pnl.querySelectorAll('.viewer').forEach((v) => v.remove());
     const v = document.createElement('div');
     v.className = 'viewer savesheet';
     v.innerHTML = `<div class="vh"><span class="grow nm">골라서 저장</span><button class="ib" data-s="close" title="닫기 (Esc)">${icon('x')}</button></div><div class="vb"><div class="empty">불러오는 중…</div></div>`;
     pnl.appendChild(v);
+    const closeSheet = () => { v.remove(); if (autoOpened && UI.open) togglePanel(false); };
     let mode = S.saveMode === 'convert' ? 'convert' : 'original';
     const tg = await send({ type: 'saveTarget', kind: it.kind, meta: it.meta, t: it.t, n: it.n, w: it.w, h: it.h, hash: it.hash, mode, fresh: true });
-    if (!tg.ok) { v.remove(); toast('저장 위치를 못 읽었어요', 'err'); return; }
+    if (!tg.ok) { closeSheet(); toast('저장 위치를 못 읽었어요', 'err'); return; }
     const conv = FMT[S.convFormat] || (S.convFormat === 'original' ? FMT[it.kind] : FMT.webp);
     const extOf = () => '.' + (mode === 'convert' ? conv[1] : FMT[it.kind] ? FMT[it.kind][1] : 'png');
     const base = tg.folder ? tg.folder + '/' : `다운로드/${tg.dlFolder || 'NovelAI'}/`;
@@ -805,12 +808,12 @@
       if (!name) { nameIn.focus(); return; }
       lastPickDir = subdir;
       try { sessionStorage.setItem('nai-studio-pickdir', subdir); } catch (e) { /* 없음 */ }
-      v.remove();
+      closeSheet();
       await saveItem(it, true, { subdir, name, mode });
     };
     dirIn.addEventListener('input', () => { typed = true; drawChips(); updHint(); });
     v.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); v.remove(); }
+      if (e.key === 'Escape') { e.preventDefault(); closeSheet(); }
       else if (e.key === 'Enter' && !e.isComposing && e.target.tagName === 'INPUT') { e.preventDefault(); doSave(); }
     });
     v.addEventListener('click', (e) => {
@@ -825,7 +828,7 @@
       }
       const b = e.target.closest('[data-s]');
       if (!b) return;
-      if (b.dataset.s === 'close') v.remove();
+      if (b.dataset.s === 'close') closeSheet();
       else if (b.dataset.s === 'save') doSave();
       else if (b.dataset.s === 'default') { dirIn.value = tg.subdir; nameIn.value = tg.name; drawChips(); updHint(); }
       else if (b.dataset.s === 'newdir') {
