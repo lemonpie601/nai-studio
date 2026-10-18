@@ -669,22 +669,30 @@
     if (!toolGroups.length) toolGroups = findToolGroupsByShape();
     return toolGroups;
   }
-  // NovelAI 가 업데이트돼서 아이콘 파일 이름이 바뀌었을 때: 글자 없는 아이콘 버튼이 3개 이상 모인 오른쪽 아래 묶음
-  const isIconBtn = (b) => !b.textContent.trim() && !b.closest('.nais-save-wrap') &&
-    (!!b.querySelector('svg') || [...b.querySelectorAll('div')].some((d) => /url\(/.test(getComputedStyle(d).maskImage || getComputedStyle(d).webkitMaskImage || '')));
+  // NovelAI 가 업데이트돼서 아이콘 파일 이름이 바뀌었을 때: 글자 없는 작은 아이콘 버튼이 3~4개 모인 화면 아래쪽 묶음
+  // (버튼이 묶음 바로 아래에 있든, 한 겹 감싼 칸 안에 있든 다 찾음 · 아이콘이 svg 든 mask 든 ::before 든 상관없음)
+  const isIconBtn = (b) => {
+    if (b.textContent.trim() || b.closest('.nais-save-wrap') || b.classList.contains('nais-save')) return false;
+    const r = b.getBoundingClientRect();
+    return r.width > 0 && r.width <= 64 && r.height <= 64;
+  };
+  const groupBtns = (g) => [...g.children].filter((c) => !c.classList.contains('nais-save-wrap') && !c.classList.contains('nais-save'))
+    .map((c) => (c.tagName === 'BUTTON' ? c : c.children.length === 1 && c.firstElementChild.tagName === 'BUTTON' ? c.firstElementChild : null));
   function findToolGroupsByShape() {
-    const hits = new Map();
+    const seen = new Set(), ok = [];
     document.querySelectorAll('button').forEach((b) => {
       if (host && host.contains(b)) return;
-      const g = b.parentElement && b.parentElement.parentElement;
-      if (!g || hits.has(g)) return;
-      const wraps = [...g.children].filter((c) => !c.classList.contains('nais-save-wrap'));
-      const btns = wraps.map((c) => c.querySelector(':scope > button')).filter(Boolean);
-      if (btns.length < 3 || btns.length > 4 || btns.length !== wraps.length || !btns.every(isIconBtn)) { hits.set(g, false); return; }
-      const r = g.getBoundingClientRect();
-      hits.set(g, r.width > 0 && r.top > innerHeight * 0.5 && r.left > innerWidth * 0.4);
+      for (const g of [b.parentElement, b.parentElement && b.parentElement.parentElement]) {
+        if (!g || seen.has(g)) continue;
+        seen.add(g);
+        if (g.closest(BAR_SEL) || g.querySelector(BAR_SEL)) continue; // 그림 위 줄은 아래에서 따로 붙임
+        const btns = groupBtns(g);
+        if (btns.length < 3 || btns.length > 4 || btns.some((x) => !x || !isIconBtn(x))) continue;
+        const r = g.getBoundingClientRect();
+        if (r.width > 0 && r.width < 400 && r.top > innerHeight * 0.5) ok.push(g);
+      }
     });
-    return [...hits].filter(([, ok]) => ok).map(([g]) => g);
+    return ok.filter((g) => !ok.some((o) => o !== g && g.contains(o)));
   }
   function makeBarButton(like, wrapLike, onClick) {
     const b = like ? like.cloneNode(false) : document.createElement('button');
@@ -709,6 +717,8 @@
     document.querySelectorAll('.nais-save').forEach((b) => { if (b.dataset.owner !== ME) (b.closest('.nais-save-wrap') || b).remove(); });
     for (const g of findToolGroups()) {
       if (g.querySelector('.nais-save')) continue;
+      const first = g.firstElementChild;
+      if (first && first.tagName === 'BUTTON') { g.appendChild(makeBarButton(first, null, () => saveFromImg(mainImage()))); continue; }
       const wrap0 = [...g.children].find((c) => c.querySelector('button'));
       if (!wrap0) continue;
       g.appendChild(makeBarButton(wrap0.querySelector('button'), wrap0, () => saveFromImg(mainImage())));
